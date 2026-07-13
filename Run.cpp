@@ -1,16 +1,14 @@
 #include "DxLib.h"
+#include <stdlib.h>
+#include <math.h>
 
-// バイクの画像を管理する定数と配列
-enum { BIKE_RED };
-const int BIKE_MAX = 1;
+// バイクの画像を管理する定数と配列（2枚分確保）
+const int BIKE_MAX = 2;
 int imgBike[BIKE_MAX];
 
-// バイクの表示位置
+// バイクの表示位置と判定四角形の更新
 void DrawBikeAndHitBox(int x, int y, int type, int* rL, int* rR, int* rT, int* rB, int* fL, int* fR, int* fT, int* fB)
 {
-	// バイクの絵を描画
-	DrawGraph(x, y, imgBike[type], TRUE);
-
 	*rL = x + 5;       // 後輪の左端
 	*rR = x + 95;       // 後輪の右端
 	*rT = y + 125;      // タイヤのゴム部分
@@ -45,89 +43,81 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 	int bgX = 0;
 	int imgBG = LoadGraph("Image/BG.jpg");
-	imgBike[BIKE_RED] = LoadGraph("Image/RedBike.png");
+
+	// ★【修正】2枚の画像ファイルを配列に読み込む
+	imgBike[0] = LoadGraph("Image/bike0.png");
+	imgBike[1] = LoadGraph("Image/bike1.png");
 
 	int imgObstacle = LoadGraph("Image/Rock.png");
 	const int OBSTACLE_WIDTH = 130, OBSTACLE_HEIGHT = 130;
 
-	// 追加アイテムの画像を読み込む
 	int imgItem = LoadGraph("Image/Item1.png");
 	const int ITEM_WIDTH = 50, ITEM_HEIGHT = 50;
 
-	// スコアアップアイテムの画像を読み込む
 	int imgScoreUP = LoadGraph("Image/ScoreUP.png");
 	const int SCOREUP_WIDTH = 50, SCOREUP_HEIGHT = 50;
 
-	// BGMの読み込み
 	int soundBGM = LoadSoundMem("Sound/BGM.mp3");
 	PlaySoundMem(soundBGM, DX_PLAYTYPE_LOOP, TRUE);
 
-	// 衝突時の効果音の読み込み
 	int soundHit = LoadSoundMem("Sound/BikeSE.mp3");
-
-	// アイテムを取得したときの効果音の読み込み
 	int soundItem = LoadSoundMem("Sound/Item1SE.mp3");
-
-	// スコアアップアイテムを取得したときの効果音の読み込み
 	int soundScoreUP = LoadSoundMem("Sound/ScoreUPSE.mp3");
-
-	// 岩を破壊したときの効果音の読み込み
 	int soundDestroy = LoadSoundMem("Sound/DestroySE.mp3");
-
-	// 無敵状態の効果音の読み込み
 	int soundInvincible = LoadSoundMem("Sound/InvincibleSE.mp3");
 
 	const int FLOOR_Y = 472;
 
 	int playerX = 100;
-	int playerY = FLOOR_Y; // バイクの初期位置を正しい地面にする
+	int playerY = FLOOR_Y;
 	int playerVY = 0;
-	int playerType = BIKE_RED;
 
 	int obstacleX = WIDTH;
-	// 岩の高さ
 	int obstacleY = FLOOR_Y + 20;
 	int obstacleSpeed = 15;
 
-	// 追加アイテムの変数
-	int itemX = WIDTH + 1500 ;
-	int itemY = FLOOR_Y - 100; // アイテムの高さを調整
+	int itemX = WIDTH + 1500;
+	int itemY = FLOOR_Y - 100;
 	int itemSpeed = 15;
-	int isItemExit = 1; // アイテムが存在するかどうかのフラグ
+	int isItemExit = 1;
 
-	// スコアアップアイテムの変数
 	int scoreUpX = WIDTH + 2000;
 	int scoreUpY = FLOOR_Y - 80;
 	int scoreUpSpeed = 15;
-	int isScoreUpExit = 1; // スコアアップアイテムが存在するかどうかのフラグ
+	int isScoreUpExit = 1;
 
-
-	// 無敵状態のタイマー
+	// 無敵タイマーとゲームオーバーフラグ
 	int invincibleTimer = 0;
-
+	// ゲームオーバーフラグ
 	int isGameOver = 0;
 	// スコア
 	int score = 0;
 	// ハイスコア
 	int hiscore = 0;
 
-	// ゲームの状態を管理する変数
 	int gameState = 0;
 
-	// タイヤの判定用変数
+	int comboCount = 0;
+
+	// アニメーション制御用の変数
+	int animeTimer = 0;
+	int animeFrame = 0;
+
 	int rearLeft = 0, rearRight = 0, rearTop = 0, rearBottom = 0;
 	int frontLeft = 0, frontRight = 0, frontTop = 0, frontBottom = 0;
 
 	// メインループ
 	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0)
 	{
-		// 画面クリア
+		// 画面をクリア
 		ClearDrawScreen();
 
 		// タイトル画面の処理
 		if (gameState == 0)
 		{
-			// スペースキーが押されたらゲーム開始
+			bgX = bgX - 2;
+			if (bgX <= -WIDTH) bgX = bgX + WIDTH;
+
 			if (CheckHitKey(KEY_INPUT_SPACE) == 1)
 			{
 				playerX = 100;
@@ -135,18 +125,23 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				playerVY = 0;
 				obstacleX = WIDTH;
 				obstacleY = FLOOR_Y + 20;
-				itemX = WIDTH + 1500;
+				itemX = WIDTH + rand() % 2000;
 				itemY = FLOOR_Y - 100;
 				isItemExit = 1;
-				scoreUpX = WIDTH + 2000;
+				scoreUpX = WIDTH + rand() % 2000 + 1000;
+				scoreUpY = FLOOR_Y - 80;
 				isScoreUpExit = 1;
 
 				invincibleTimer = 0;
 				isGameOver = 0;
 				score = 0;
+				comboCount = 0;
+				animeTimer = 0;
+				animeFrame = 0;
 
+				StopSoundMem(soundInvincible);
 				PlaySoundMem(soundBGM, DX_PLAYTYPE_LOOP, TRUE);
-				gameState = 1; // ゲームプレイ状態に遷移
+				gameState = 1;
 			}
 		}
 		// ゲームプレイ中の処理
@@ -154,7 +149,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{
 			if (isGameOver == 0)
 			{
-				// 無敵タイマーのカウントダウン
+				// 無敵タイマーの処理
 				if (invincibleTimer > 0)
 				{
 					invincibleTimer--;
@@ -165,17 +160,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					}
 				}
 
-				// 背景のスクロール処理
+				// ゲームの更新処理 
 				bgX = bgX - 2;
 				if (bgX <= -WIDTH) bgX = bgX + WIDTH;
 
-				// ジャンプ処理
+				// スペースキーでジャンプ
 				if (CheckHitKey(KEY_INPUT_SPACE) == 1 && playerY == FLOOR_Y)
 				{
 					playerVY = -20;
 				}
 
-				// 重力と移動の計算
+				// 重力の処理
 				playerVY += 1;
 				playerY += playerVY;
 
@@ -183,6 +178,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				{
 					playerY = FLOOR_Y;
 					playerVY = 0;
+
+					// ★【修正】2枚が交互にパラパラ動くタイマー計算
+					animeTimer++;
+					if (animeTimer % 8 == 0) // ここの「8」の数値でパタパタ動く速さを変えられます
+					{
+						animeFrame = (animeFrame + 1) % BIKE_MAX; // 0→1→0→1... とループ
+					}
+				}
+				else
+				{
+					// 空中では1コマ目に固定
+					animeFrame = 0;
 				}
 
 				// 障害物の移動
@@ -195,7 +202,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					if (score > hiscore) hiscore = score;
 				}
 
-				// 追加アイテムの移動
+				// 無敵アイテムの移動
 				itemX -= itemSpeed;
 				if (itemX < -ITEM_WIDTH)
 				{
@@ -208,24 +215,24 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				scoreUpX -= scoreUpSpeed;
 				if (scoreUpX < -SCOREUP_WIDTH)
 				{
+					comboCount = 0;
+
 					scoreUpX = WIDTH + rand() % 2000 + rand() % 2500;
-					scoreUpY = FLOOR_Y - (60 + rand() % 60); // 毎回少し高さを変えるとおもしろくなります
+					scoreUpY = FLOOR_Y - (60 + rand() % 60);
 					isScoreUpExit = 1;
 
-					// 無敵アイテムとの距離を計算し、近すぎたら
-					// スコアアップアイテムをさらに右へズラして重なりを防ぐ
+					// スコアアップアイテムが障害物と重ならないようにする
 					if (abs(scoreUpX - itemX) < 400)
 					{
 						scoreUpX += 500;
 					}
 				}
 
-				// 座標と当たり判定用変数の更新
-				DrawBikeAndHitBox(playerX, playerY, playerType,
+				DrawBikeAndHitBox(playerX, playerY, animeFrame,
 					&rearLeft, &rearRight, &rearTop, &rearBottom,
 					&frontLeft, &frontRight, &frontTop, &frontBottom);
 
-				// 各種中心座標の計算
+				// 障害物の中心座標と半径を計算
 				int oCenter_X = obstacleX + 80; int oCenter_Y = obstacleY + 95; int oCenter_R = 45;
 				int oLeft_X = obstacleX + 35;   int oLeft_Y = obstacleY + 130;  int oLeft_R = 25;
 				int oRight_X = obstacleX + 120; int oRight_Y = obstacleY + 130; int oRight_R = 25;
@@ -241,8 +248,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				int frontCenterX = (frontLeft + frontRight) / 2;
 				int frontCenterY = (frontTop + frontBottom) / 2;
 				int frontRadius = (frontRight - frontLeft) / 2;
-
-				// アイテム衝突判定
+				// バイクの当たり判定を円形に変更
 				if (isItemExit == 1)
 				{
 					if (CheckCircleHit(rearCenterX, rearCenterY, rearRadius, iCenter_X, iCenter_Y, iCenter_R) ||
@@ -259,28 +265,29 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					}
 				}
 
-				// スコアアップアイテム衝突判定
+
 				if (isScoreUpExit == 1)
 				{
-					// アイテムの中心座標と判定半径の計算
+					// スコアアップアイテムの中心座標と半径を計算
 					int suCenter_X = scoreUpX + (SCOREUP_WIDTH / 2);
 					int suCenter_Y = scoreUpY + (SCOREUP_HEIGHT / 2);
-					int suCenter_R = 25; // 判定の大きさ
+					int suCenter_R = 25;
 
-					// バイクの後輪または前輪が当たったかチェック
+					// スコアアップアイテムの当たり判定を円形に変更
 					if (CheckCircleHit(rearCenterX, rearCenterY, rearRadius, suCenter_X, suCenter_Y, suCenter_R) ||
 						CheckCircleHit(frontCenterX, frontCenterY, frontRadius, suCenter_X, suCenter_Y, suCenter_R))
 					{
 						isScoreUpExit = 0;
-						score += 100; // スコアを大きく加算（例：100点）
+						comboCount++;
+						score += 100 * comboCount;
 						if (score > hiscore) hiscore = score;
 
-						// 効果音を鳴らす
+
 						PlaySoundMem(soundScoreUP, DX_PLAYTYPE_BACK, TRUE);
 					}
 				}
 
-				// 障害物衝突判定
+
 				bool isRearHit = CheckCircleHit(rearCenterX, rearCenterY, rearRadius, oCenter_X, oCenter_Y, oCenter_R) ||
 					CheckCircleHit(rearCenterX, rearCenterY, rearRadius, oLeft_X, oLeft_Y, oLeft_R) ||
 					CheckCircleHit(rearCenterX, rearCenterY, rearRadius, oRight_X, oRight_Y, oRight_R);
@@ -308,9 +315,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					}
 				}
 			}
-			else // ゲームオーバー中の入力処理
+			else
 			{
-				// Rキーでリスタート
+
 				if (CheckHitKey(KEY_INPUT_R) == 1)
 				{
 					playerX = 100;
@@ -322,19 +329,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					itemY = FLOOR_Y - 100;
 					isItemExit = 1;
 					scoreUpX = WIDTH + rand() % 2000 + 1000;
+					scoreUpY = FLOOR_Y - 80;
 					isScoreUpExit = 1;
 
 					invincibleTimer = 0;
 					isGameOver = 0;
 					score = 0;
+					comboCount = 0;
+					animeTimer = 0;
+					animeFrame = 0;
 
 					StopSoundMem(soundInvincible);
 					PlaySoundMem(soundBGM, DX_PLAYTYPE_LOOP, TRUE);
 
-					// リスタート直後の即死を防ぐため、一度座標と判定を強制更新
-					DrawBikeAndHitBox(playerX, playerY, playerType, &rearLeft, &rearRight, &rearTop, &rearBottom, &frontLeft, &frontRight, &frontTop, &frontBottom);
+					DrawBikeAndHitBox(playerX, playerY, animeFrame, &rearLeft, &rearRight, &rearTop, &rearBottom, &frontLeft, &frontRight, &frontTop, &frontBottom);
 				}
-				// Tキーでタイトルに戻る
+				
 				if (CheckHitKey(KEY_INPUT_T) == 1)
 				{
 					gameState = 0;
@@ -342,7 +352,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-		// 背景の描画
+		// --- 描画セクション ---
 		DrawGraph(bgX, 0, imgBG, FALSE);
 		DrawGraph(bgX + WIDTH, 0, imgBG, FALSE);
 
@@ -353,14 +363,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		}
 		else if (gameState == 1)
 		{
-			// 障害物・アイテムの描画
+
 			DrawExtendGraph(obstacleX, obstacleY + 20, obstacleX + OBSTACLE_WIDTH, obstacleY + OBSTACLE_HEIGHT + 20, imgObstacle, TRUE);
+
 			if (isItemExit == 1)
 			{
 				DrawExtendGraph(itemX, itemY, itemX + ITEM_WIDTH, itemY + ITEM_HEIGHT, imgItem, TRUE);
 			}
 
-			// スコアアップアイテムの描画
+
 			if (isScoreUpExit == 1)
 			{
 				DrawExtendGraph(scoreUpX, scoreUpY, scoreUpX + SCOREUP_WIDTH, scoreUpY + SCOREUP_HEIGHT, imgScoreUP, TRUE);
@@ -369,32 +380,32 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			// バイクの描画（無敵時の点滅処理含む）
 			if (invincibleTimer == 0 || (invincibleTimer / 4) % 2 == 0)
 			{
-				// ※ここでは実際の描画のみを行う
-				DrawGraph(playerX, playerY, imgBike[playerType], TRUE);
+				DrawGraph(playerX, playerY, imgBike[animeFrame], TRUE);
 			}
 
-			// UIの描画
+			// スコアとハイスコアの描画
 			DrawFormatString(20, 20, GetColor(255, 255, 255), "SCORE: %d", score);
 			DrawFormatString(20, 50, GetColor(255, 255, 0), "HISCORE: %d", hiscore);
 
-			if (invincibleTimer > 0)
+			if (comboCount >= 2)
 			{
-				DrawBox(20, 80, 20 + invincibleTimer, 95, GetColor(255, 128, 0), TRUE);
-				DrawString(25, 80, "INVINCIBLE!", GetColor(255, 255, 255));
+				SetFontSize(40);
+				DrawFormatString(WIDTH / 2 - 80, 100, GetColor(255, 200, 0), "%d COMBO!", comboCount); SetFontSize(16);
 			}
-
-			if (isGameOver == 1)
-			{
+			if (invincibleTimer > 0) 
+			{ DrawBox(20, 80, 20 + invincibleTimer, 95, GetColor(255, 128, 0), TRUE); DrawString(25, 80, "INVINCIBLE!", GetColor(255, 255, 255)); }
+			if (isGameOver == 1) 
+			{ 
 				DrawString(WIDTH / 2 - 100, HEIGHT / 2 - 20, "GAME OVER", GetColor(255, 0, 0));
 				DrawString(WIDTH / 2 - 140, HEIGHT / 2 + 10, "Press R Key to Restart / T Key to Title", GetColor(255, 255, 255));
 			}
 		}
 
-		// 表画面に反映
+
 		ScreenFlip();
-		WaitTimer(16);
+		WaitTimer(16); 
 	}
 
-	DxLib_End();
-	return 0;
+	DxLib_End(); 
+	return 0; 
 }
