@@ -44,15 +44,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	int bgX = 0;
 	int imgBG = LoadGraph("Image/BG.jpg");
 
-	// ★【修正】2枚の画像ファイルを配列に読み込む
-	imgBike[0] = LoadGraph("Image/bike0.png");
-	imgBike[1] = LoadGraph("Image/bike1.png");
+	// 2枚の画像ファイルを配列に読み込む
+	imgBike[0] = LoadGraph("Image/Redbike0.png");
+	imgBike[1] = LoadGraph("Image/Redbike1.png");
 
 	int imgObstacle = LoadGraph("Image/Rock.png");
 	const int OBSTACLE_WIDTH = 130, OBSTACLE_HEIGHT = 130;
 
 	int imgItem = LoadGraph("Image/Item1.png");
 	const int ITEM_WIDTH = 50, ITEM_HEIGHT = 50;
+	const int GHOST_MAX = 5;
+	int ghostX[5] = { 0 };
+	int ghostY[5] = { 0 };
+	int ghostFrame[5] = { 0 };
+	int ghostCount = 0;
 
 	int imgScoreUP = LoadGraph("Image/ScoreUP.png");
 	const int SCOREUP_WIDTH = 50, SCOREUP_HEIGHT = 50;
@@ -179,7 +184,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					playerY = FLOOR_Y;
 					playerVY = 0;
 
-					// ★【修正】2枚が交互にパラパラ動くタイマー計算
+					// 2枚が交互にパラパラ動くタイマー計算
 					animeTimer++;
 					if (animeTimer % 8 == 0) // ここの「8」の数値でパタパタ動く速さを変えられます
 					{
@@ -227,6 +232,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 						scoreUpX += 500;
 					}
 				}
+
+				// 毎フレームのプレイヤーの位置を残像配列に記録
+				ghostX[ghostCount] = playerX;
+				ghostY[ghostCount] = playerY;
+				ghostFrame[ghostCount] = animeFrame;
+				ghostCount = (ghostCount + 1) % GHOST_MAX;
 
 				DrawBikeAndHitBox(playerX, playerY, animeFrame,
 					&rearLeft, &rearRight, &rearTop, &rearBottom,
@@ -344,7 +355,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 					DrawBikeAndHitBox(playerX, playerY, animeFrame, &rearLeft, &rearRight, &rearTop, &rearBottom, &frontLeft, &frontRight, &frontTop, &frontBottom);
 				}
-				
+
 				if (CheckHitKey(KEY_INPUT_T) == 1)
 				{
 					gameState = 0;
@@ -352,7 +363,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-		// --- 描画セクション ---
+		// 描画セクション
 		DrawGraph(bgX, 0, imgBG, FALSE);
 		DrawGraph(bgX + WIDTH, 0, imgBG, FALSE);
 
@@ -378,9 +389,53 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 
 			// バイクの描画（無敵時の点滅処理含む）
-			if (invincibleTimer == 0 || (invincibleTimer / 4) % 2 == 0)
+			float angle = 0.0f; // 通常時（地面）は 0度（水平）
+			if (playerY < FLOOR_Y)
 			{
-				DrawGraph(playerX, playerY, imgBike[animeFrame], TRUE);
+				angle = playerVY * 0.015f; // ここの 0.015f の数値を大きくするとより激しく傾きます
+
+				// 傾きが大きくなりすぎないように制限（最大約25度まで）
+				if (angle < -0.45f) angle = -0.45f;
+				if (angle > 0.45f) angle = 0.45f;
+			}
+
+			// バイク画像1枚あたりのサイズ（※お手持ちの画像のサイズが 200x200 なら 100 に変更してください）
+			const int BIKE_HALF_W = 141.5;
+			const int BIKE_HALF_H = 85;
+
+			// 本体と無敵残像の描画
+			if (invincibleTimer > 0)
+			{
+				//　無敵状態の描画
+
+				// 残像の描画
+				for (int i = 0; i < GHOST_MAX; i++)
+				{
+					int idx = (ghostCount + i) % GHOST_MAX;
+					int alpha = 50 + (i * 40);
+
+					SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+
+					int offset_x = ghostX[idx] - (GHOST_MAX - i) * 6;
+
+					// 残像も DrawRotaGraph で傾けて描画
+					// 引数：中心X, 中心Y, 拡大率(1.0), 角度(ラジアン), グラフィックハンドル, 反転フラグ
+					DrawRotaGraph(offset_x + BIKE_HALF_W, ghostY[idx] + BIKE_HALF_H, 1.0, angle, imgBike[ghostFrame[idx]], TRUE);
+				}
+
+				SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+				// 本体を点滅描画
+				if ((invincibleTimer / 4) % 2 == 0)
+				{
+					// DrawRotaGraph に変更
+					DrawRotaGraph(playerX + BIKE_HALF_W, playerY + BIKE_HALF_H, 1.0, angle, imgBike[animeFrame], TRUE);
+				}
+			}
+			else
+			{
+				// 通常状態の描画
+				DrawRotaGraph(playerX + BIKE_HALF_W, playerY + BIKE_HALF_H, 1.0, angle, imgBike[animeFrame], TRUE);
 			}
 
 			// スコアとハイスコアの描画
@@ -392,10 +447,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				SetFontSize(40);
 				DrawFormatString(WIDTH / 2 - 80, 100, GetColor(255, 200, 0), "%d COMBO!", comboCount); SetFontSize(16);
 			}
-			if (invincibleTimer > 0) 
-			{ DrawBox(20, 80, 20 + invincibleTimer, 95, GetColor(255, 128, 0), TRUE); DrawString(25, 80, "INVINCIBLE!", GetColor(255, 255, 255)); }
-			if (isGameOver == 1) 
-			{ 
+			if (invincibleTimer > 0)
+			{
+				DrawBox( 20, 80, 20 + invincibleTimer, 95, GetColor(255, 128, 0), TRUE); 
+				DrawString( 25, 80, "INVINCIBLE!", GetColor(255, 255, 255));
+			}
+			if (isGameOver == 1)
+			{
 				DrawString(WIDTH / 2 - 100, HEIGHT / 2 - 20, "GAME OVER", GetColor(255, 0, 0));
 				DrawString(WIDTH / 2 - 140, HEIGHT / 2 + 10, "Press R Key to Restart / T Key to Title", GetColor(255, 255, 255));
 			}
@@ -403,9 +461,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 
 		ScreenFlip();
-		WaitTimer(16); 
+		WaitTimer(16);
 	}
 
-	DxLib_End(); 
-	return 0; 
+	DxLib_End();
+	return 0;
 }
