@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-// バイクの画像を管理する定数と配列（2枚分確保）
+// バイクの画像を管理する定数と配列
 const int BIKE_MAX = 2;
 int imgBike[BIKE_MAX];
 
@@ -48,9 +48,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	imgBike[0] = LoadGraph("Image/Redbike0.png");
 	imgBike[1] = LoadGraph("Image/Redbike1.png");
 
+	// 岩の画像を読み込む
 	int imgObstacle = LoadGraph("Image/Rock.png");
 	const int OBSTACLE_WIDTH = 130, OBSTACLE_HEIGHT = 130;
-
+	// 無敵アイテムの画像を読み込む
 	int imgItem = LoadGraph("Image/Item1.png");
 	const int ITEM_WIDTH = 50, ITEM_HEIGHT = 50;
 	const int GHOST_MAX = 5;
@@ -59,16 +60,21 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	int ghostFrame[5] = { 0 };
 	int ghostCount = 0;
 
+	// スコアアップアイテムの画像を読み込む
 	int imgScoreUP = LoadGraph("Image/ScoreUP.png");
 	const int SCOREUP_WIDTH = 50, SCOREUP_HEIGHT = 50;
-
+	// BGMを読み込む
 	int soundBGM = LoadSoundMem("Sound/BGM.mp3");
 	PlaySoundMem(soundBGM, DX_PLAYTYPE_LOOP, TRUE);
-
+	// バイクが壊れた時のSEを読み込む
 	int soundHit = LoadSoundMem("Sound/BikeSE.mp3");
+	// 無敵アイテムを取った時のSEを読み込む
 	int soundItem = LoadSoundMem("Sound/Item1SE.mp3");
+	// スコアアイテムを取った時のSEを読み込む
 	int soundScoreUP = LoadSoundMem("Sound/ScoreUPSE.mp3");
+	// 岩を破壊した時のSEを読み込む
 	int soundDestroy = LoadSoundMem("Sound/DestroySE.mp3");
+	// 無敵中のSEを読み込む
 	int soundInvincible = LoadSoundMem("Sound/InvincibleSE.mp3");
 
 	const int FLOOR_Y = 472;
@@ -186,14 +192,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 					// 2枚が交互にパラパラ動くタイマー計算
 					animeTimer++;
-					if (animeTimer % 8 == 0) // ここの「8」の数値でパタパタ動く速さを変えられます
+					if (animeTimer % 6 == 0) // ここの「6」の数値でパタパタ動く速さを変える
 					{
-						animeFrame = (animeFrame + 1) % BIKE_MAX; // 0→1→0→1... とループ
+						animeFrame = (animeFrame + 1) % BIKE_MAX; // 0→1→0→1とループ
 					}
 				}
 				else
 				{
-					// 空中では1コマ目に固定
 					animeFrame = 0;
 				}
 
@@ -388,25 +393,25 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				DrawExtendGraph(scoreUpX, scoreUpY, scoreUpX + SCOREUP_WIDTH, scoreUpY + SCOREUP_HEIGHT, imgScoreUP, TRUE);
 			}
 
-			// バイクの描画（無敵時の点滅処理含む）
+			// バイクの描画
 			float angle = 0.0f; // 通常時（地面）は 0度（水平）
 			if (playerY < FLOOR_Y)
 			{
-				angle = playerVY * 0.015f; // ここの 0.015f の数値を大きくするとより激しく傾きます
+				angle = playerVY * 0.015f; // ここの 0.015f の数値を大きくするとより激しく傾く
 
 				// 傾きが大きくなりすぎないように制限（最大約25度まで）
 				if (angle < -0.45f) angle = -0.45f;
 				if (angle > 0.45f) angle = 0.45f;
 			}
 
-			// バイク画像1枚あたりのサイズ（※お手持ちの画像のサイズが 200x200 なら 100 に変更してください）
+			// バイク画像1枚あたりのサイズ
 			const int BIKE_HALF_W = 141.5;
 			const int BIKE_HALF_H = 85;
 
 			// 本体と無敵残像の描画
 			if (invincibleTimer > 0)
 			{
-				//　無敵状態の描画
+				// 無敵状態の描画
 
 				// 残像の描画
 				for (int i = 0; i < GHOST_MAX; i++)
@@ -418,8 +423,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 					int offset_x = ghostX[idx] - (GHOST_MAX - i) * 6;
 
-					// 残像も DrawRotaGraph で傾けて描画
-					// 引数：中心X, 中心Y, 拡大率(1.0), 角度(ラジアン), グラフィックハンドル, 反転フラグ
 					DrawRotaGraph(offset_x + BIKE_HALF_W, ghostY[idx] + BIKE_HALF_H, 1.0, angle, imgBike[ghostFrame[idx]], TRUE);
 				}
 
